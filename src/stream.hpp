@@ -19,8 +19,10 @@ public:
 
     virtual bool IsCanGoBack() const = 0;
 
-    virtual void Open() = 0;
-    virtual void Close() = 0;
+    virtual void Open() {
+    }
+    virtual void Close() {
+    }
 };
 
 template <typename T>
@@ -32,6 +34,8 @@ public:
 
     virtual size_t Write(const T& item) = 0;
 
-    virtual void Open() = 0;
-    virtual void Close() = 0;
+    virtual void Open() {
+    }
+    virtual void Close() {
+    }
 };

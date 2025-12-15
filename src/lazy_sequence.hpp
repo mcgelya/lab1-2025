@@ -182,7 +182,7 @@ private:
         }
 
         bool HasNext() const override {
-            return it_->Index() != endIndex_;
+            return it_->Index() != endIndex_ + 1;
         }
 
         std::optional<T> TryGetNext() override {

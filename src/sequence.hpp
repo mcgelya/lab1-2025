@@ -27,6 +27,8 @@ public:
     virtual void Append(const T& item) = 0;
     virtual void Prepend(const T& item) = 0;
     virtual void InsertAt(const T& item, size_t index) = 0;
+
+    virtual void Clear() = 0;
 };
 
 template <class T>

@@ -82,7 +82,7 @@ public:
     ArraySequence(DynamicArray<T> a) : capacity_(a.GetSize()), size_(a.GetSize()), data_(std::move(a)) {
     }
 
-    ArraySequence(const Sequence<T>& a) : capacity_(a.GetLength()), size_(0), data_(capacity_) {
+    ArraySequence(const Sequence<T>& a) : capacity_(a.GetCapacity()), size_(0), data_(capacity_) {
         for (IConstEnumeratorPtr<T> it = a.GetConstEnumerator(); !it->IsEnd(); it->MoveNext()) {
             Append(it->ConstDereference());
         }
@@ -166,6 +166,10 @@ public:
 
     void InsertAt(const T& item, size_t index) override {
         Insert(item, index);
+    }
+
+    void Clear() override {
+        size_ = 0;
     }
 
     IEnumeratorPtr<T> GetEnumerator() override {

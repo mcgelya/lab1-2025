@@ -38,16 +38,11 @@ public:
             throw std::out_of_range("index is greater than length");
         }
         index_ = index;
+        return index_;
     }
 
     bool IsCanGoBack() const override {
         return true;
-    }
-
-    void Open() override {
-    }
-
-    void Close() override {
     }
 
 private:
@@ -86,16 +81,11 @@ public:
             throw std::out_of_range("index is greater than length");
         }
         index_ = index;
+        return index_;
     }
 
     bool IsCanGoBack() const override {
         return true;
-    }
-
-    void Open() override {
-    }
-
-    void Close() override {
     }
 
 private:
@@ -145,12 +135,6 @@ public:
         return false;
     }
 
-    void Open() override {
-    }
-
-    void Close() override {
-    }
-
 private:
     std::string in_;
     size_t index_ = 0;
@@ -161,7 +145,11 @@ private:
 template <typename T, typename Parse>
 class FileReadStream : public ReadOnlyStream<T> {
 public:
-    FileReadStream(std::string file, Parse parse) : if_(std::move(file)), count_(0), parse_(std::move(parse)) {
+    FileReadStream(const std::string& file, Parse parse)
+        : if_(file, std::ios::binary), count_(0), parse_(std::move(parse)) {
+        if (!if_.is_open()) {
+            throw std::runtime_error("Cannot open file");
+        }
     }
 
     bool IsEndOfStream() const override {
@@ -172,10 +160,8 @@ public:
         if (IsEndOfStream()) {
             throw std::runtime_error("End of stream");
         }
-        std::string s;
-        if_ >> s;
         ++count_;
-        return parse_(s);
+        return parse_(if_);
     }
 
     size_t GetPosition() const override {
@@ -192,9 +178,6 @@ public:
 
     bool IsCanGoBack() const override {
         return false;
-    }
-
-    void Open() override {
     }
 
     void Close() override {

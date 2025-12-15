@@ -15,15 +15,9 @@ public:
         return seq_->GetLength();
     }
 
-    size_t Write(const T& item) {
+    size_t Write(const T& item) override {
         seq_->Append(item);
         return seq_->GetLength();
-    }
-
-    void Open() override {
-    }
-
-    void Close() override {
     }
 
 private:
@@ -33,21 +27,21 @@ private:
 template <typename T, typename Serialize>
 class FileWriteStream : public WriteOnlyStream<T> {
 public:
-    FileWriteStream(std::string file, Serialize serialize)
-        : of_(std::move(file)), index_(0), serialize_(std::move(serialize)) {
+    FileWriteStream(const std::string& file, Serialize serialize)
+        : of_(file, std::ios::binary), index_(0), serialize_(std::move(serialize)) {
+        if (!of_.is_open()) {
+            throw std::runtime_error("Cannot open file");
+        }
     }
 
     size_t GetPosition() const override {
         return index_;
     }
 
-    size_t Write(const T& item) {
-        of_ << serialize_(item);
+    size_t Write(const T& item) override {
+        serialize_(of_, item);
         ++index_;
         return index_;
-    }
-
-    void Open() override {
     }
 
     void Close() override {
