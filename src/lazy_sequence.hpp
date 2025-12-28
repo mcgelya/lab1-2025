@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <utility>
 
 #include "array_sequence.hpp"
 #include "cardinal.hpp"
@@ -35,6 +36,9 @@ private:
 
 template <typename T>
 class LazySequence : public std::enable_shared_from_this<LazySequence<T>> {
+    template <typename>
+    friend class LazySequence;
+
 private:
     class IGenerator;
 
@@ -86,7 +90,7 @@ private:
 
     class DefaultGenerator : public IGenerator {
     public:
-        DefaultGenerator(LazySequencePtr<T> seq) : seq_(std::move(seq), it_(seq_->GetConstEnumerator())) {
+        explicit DefaultGenerator(LazySequencePtr<T> seq) : seq_(std::move(seq)), it_(seq_->GetConstEnumerator()) {
         }
 
         T GetNext() override {
@@ -241,7 +245,8 @@ private:
 
     class AppendGenerator : public IGenerator {
     public:
-        AppendGenerator(LazySequencePtr<T> seq, const T& item) : seq_(std::move(seq)), item_(item), added_(false) {
+        AppendGenerator(LazySequencePtr<T> seq, const T& item)
+            : seq_(std::move(seq)), it_(seq_->GetConstEnumerator()), item_(item), added_(false) {
         }
 
         T GetNext() override {
@@ -421,7 +426,8 @@ private:
         }
 
         bool HasNext() const override {
-            return !it1_->IsEnd() || !it2_->IsEnd();
+            // Zip ends as soon as any input ends.
+            return !it1_->IsEnd() && !it2_->IsEnd();
         }
 
         std::optional<T> TryGetNext() override {
@@ -450,19 +456,24 @@ private:
             if (!HasNext()) {
                 throw std::out_of_range("GetNext: no next element");
             }
+            hasPrefetch_ = false;
+            return std::move(prefetch_.value());
+        }
+
+        bool HasNext() const override {
+            if (hasPrefetch_) {
+                return true;
+            }
             while (!it_->IsEnd() && !func_(it_->ConstDereference())) {
                 it_->MoveNext();
             }
             if (it_->IsEnd()) {
-                throw std::out_of_range("GetNext: no next element");
+                return false;
             }
-            T res = it_->ConstDereference();
+            prefetch_ = it_->ConstDereference();
             it_->MoveNext();
-            return res;
-        }
-
-        bool HasNext() const override {
-            return !it_->IsEnd();
+            hasPrefetch_ = true;
+            return true;
         }
 
         std::optional<T> TryGetNext() override {
@@ -477,6 +488,9 @@ private:
         LazySequencePtr<T> seq_;
         IConstEnumeratorPtr<T> it_;
         Func func_;
+
+        mutable bool hasPrefetch_ = false;
+        mutable std::optional<T> prefetch_;
     };
 
 public:
@@ -544,7 +558,7 @@ public:
 
     // Concat
     LazySequence(LazySequencePtr<T> seq1, LazySequencePtr<T> seq2, ConcatTag)
-        : length_(seq1->length_ + seq2->length_),
+        : length_(seq1->GetLength() + seq2->GetLength()),
           items_(std::make_unique<ArraySequence<T>>()),
           generator_(std::make_unique<ConcatGenerator>(std::move(seq1), std::move(seq2))) {
     }
@@ -552,7 +566,7 @@ public:
     // Map
     template <typename T2, typename Func>
     LazySequence(LazySequencePtr<T2> seq, Func func, MapTag)
-        : length_(seq->length_),
+        : length_(seq->GetLength()),
           items_(std::make_unique<ArraySequence<T>>()),
           generator_(std::make_unique<MapGenerator<T2, Func>>(std::move(seq), std::move(func))) {
     }
@@ -560,7 +574,7 @@ public:
     // Where
     template <typename Func>
     LazySequence(LazySequencePtr<T> seq, Func func, WhereTag)
-        : length_(seq->length_),  // not bounding, generating till done
+        : length_(seq->GetLength()),  // Upper bound; exact length is unknown without full evaluation.
           items_(std::make_unique<ArraySequence<T>>()),
           generator_(std::make_unique<WhereGenerator<Func>>(std::move(seq), std::move(func))) {
     }
@@ -568,7 +582,7 @@ public:
     // Zip
     template <typename T1, typename T2>
     LazySequence(LazySequencePtr<T1> seq1, LazySequencePtr<T2> seq2, ZipTag)
-        : length_(std::min(seq1->length_, seq2->length_)),
+        : length_(std::min(seq1->GetLength(), seq2->GetLength())),
           items_(std::make_unique<ArraySequence<T>>()),
           generator_(std::make_unique<ZipGenerator<T1, T2>>(std::move(seq1), std::move(seq2))) {
     }
@@ -642,7 +656,8 @@ public:
     template <typename Func>
     auto Map(Func func) {
         using T2 = typename std::invoke_result_t<Func, T>;
-        return std::make_shared<LazySequence<T2>>(this->shared_from_this(), std::move(func), MapTag{});
+        return std::make_shared<LazySequence<T2>>(this->shared_from_this(), std::move(func),
+                                                  typename LazySequence<T2>::MapTag{});
     }
 
     template <typename T2, typename Func>
@@ -661,7 +676,9 @@ public:
 
     template <typename T2>
     auto Zip(LazySequencePtr<T2> seq) {
-        return std::make_shared<LazySequencePtr<std::pair<T, T2>>>(this->shared_from_this(), std::move(seq), ZipTag{});
+        using Out = std::pair<T, T2>;
+        return std::make_shared<LazySequence<Out>>(this->shared_from_this(), std::move(seq),
+                                                   typename LazySequence<Out>::ZipTag{});
     }
 
     IConstEnumeratorPtr<T> GetConstEnumerator() {
