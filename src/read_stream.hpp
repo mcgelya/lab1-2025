@@ -180,10 +180,6 @@ public:
         return false;
     }
 
-    void Close() override {
-        if_.close();
-    }
-
 private:
     std::ifstream if_;
     size_t count_ = 0;

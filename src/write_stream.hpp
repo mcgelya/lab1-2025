@@ -44,10 +44,6 @@ public:
         return index_;
     }
 
-    void Close() override {
-        of_.close();
-    }
-
 private:
     std::ofstream of_;
     size_t index_ = 0;

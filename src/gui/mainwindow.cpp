@@ -369,7 +369,6 @@ bool MainWindow::encodeToFile(const QString& outPath, QString* error) {
         while (!encoder->IsEndOfStream()) {
             writer->Write(encoder->Read());
         }
-        writer->Close();
 
         auto end = std::chrono::steady_clock::now();
         const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
